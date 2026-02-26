@@ -1,137 +1,196 @@
-import numpy as np
-from backend.versioning import get_earliest_and_latest
+import sqlite3
+from backend.database import DB_PATH
 from backend.text_processing import normalize_text
 from backend.chunking import chunk_text
-from backend.embedding_engine import generate_embeddings
-from backend.similarity_engine import compute_similarity_matrix
+from backend.embedding_engine import embed_chunks, compute_similarity_matrix
+from backend.llm_risk_engine import analyze_clause_with_llm
 
 
-# Similarity thresholds
-SIMILARITY_SAME = 0.85
-SIMILARITY_MODIFIED = 0.60
+# ==============================
+# Structural Drift Calculation
+# ==============================
 
-
-def classify_drift(old_chunks, new_chunks, similarity_matrix):
-    """
-    Classify clauses into:
-    - unchanged
-    - modified
-    - removed
-    - added
-    """
-
-    unchanged = 0
-    modified = 0
-    removed = 0
-
-    matched_new_indices = set()
-
-    for i in range(len(old_chunks)):
-
-        if similarity_matrix.size == 0:
-            removed += 1
-            continue
-
-        row = similarity_matrix[i]
-        max_sim = np.max(row)
-        max_index = np.argmax(row)
-
-        if max_sim >= SIMILARITY_SAME:
-            unchanged += 1
-            matched_new_indices.add(max_index)
-
-        elif SIMILARITY_MODIFIED <= max_sim < SIMILARITY_SAME:
-            modified += 1
-            matched_new_indices.add(max_index)
-
-        else:
-            removed += 1
-
-    # New clauses that were never matched
-    added = len(new_chunks) - len(matched_new_indices)
-
-    return unchanged, modified, removed, added
-
-
-def compute_drift_score(modified, removed, added, total_old):
-    """
-    Structural Drift Score (percentage of clauses changed)
-    """
-
+def compute_structural_drift(modified, removed, added, total_old):
     if total_old == 0:
         return 0.0
 
-    total_changes = modified + removed + added
-    structural_drift = (total_changes / total_old) * 100
+    modified_ratio = modified / total_old
+    removed_ratio = removed / total_old
+    added_ratio = added / total_old
 
-    return round(structural_drift, 2)
+    score = (
+        modified_ratio * 0.4 +
+        removed_ratio * 0.3 +
+        added_ratio * 0.3
+    ) * 100
+
+    return round(score, 2)
 
 
-def compute_policy_drift(company_name: str):
-    """
-    Full drift detection pipeline
-    """
+# ==============================
+# NEW Semantic Risk Aggregation
+# ==============================
 
-    versions = get_earliest_and_latest(company_name)
+def aggregate_semantic_risk(clause_results, structural_drift):
 
-    if not versions or not versions[0] or not versions[1]:
+    if not clause_results:
+        return 0.0, "LOW"
+
+    scores = [c["risk_score"] for c in clause_results]
+
+    max_risk = max(scores)
+    high_risk_count = len([s for s in scores if s >= 7])
+    medium_risk_count = len([s for s in scores if 4 <= s < 7])
+
+    # --- Weighted Model ---
+    base_score = (
+        max_risk * 0.5 +             # Worst clause dominates
+        high_risk_count * 0.7 +      # Multiple high-risk clauses amplify
+        medium_risk_count * 0.3      # Moderate accumulation
+    )
+
+    # Structural amplification
+    structural_multiplier = 1 + (structural_drift / 200)
+
+    final_score = base_score * structural_multiplier
+
+    # Normalize to 0–10 scale
+    final_score = min(round(final_score, 2), 10)
+
+    # Risk Level Classification
+    if final_score >= 7:
+        level = "HIGH"
+    elif final_score >= 4:
+        level = "MEDIUM"
+    else:
+        level = "LOW"
+
+    return final_score, level
+
+
+# ==============================
+# Policy Drift Engine
+# ==============================
+
+def compute_policy_drift(company_name):
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id FROM companies WHERE name=?
+    """, (company_name,))
+    company = cursor.fetchone()
+
+    if not company:
+        print("Company not found.")
+        return
+
+    company_id = company[0]
+
+    cursor.execute("""
+        SELECT content FROM policy_versions
+        WHERE company_id=?
+        ORDER BY timestamp DESC
+        LIMIT 2
+    """, (company_id,))
+
+    versions = cursor.fetchall()
+
+    if len(versions) < 2:
         print("Not enough versions to compare.")
         return
 
-    old_text = versions[0]
-    new_text = versions[1]
+    new_text = versions[0][0]
+    old_text = versions[1][0]
 
-    # 1️⃣ Normalize
+    conn.close()
+
+    # Normalize
     old_clean = normalize_text(old_text)
     new_clean = normalize_text(new_text)
 
-    # 2️⃣ Sentence-level chunking
+    # Chunk
     old_chunks = chunk_text(old_clean)
     new_chunks = chunk_text(new_clean)
 
     print(f"\nOld Chunks: {len(old_chunks)}")
     print(f"New Chunks: {len(new_chunks)}")
 
-    if len(old_chunks) == 0 or len(new_chunks) == 0:
-        print("Chunking failed — no clauses detected.")
-        return
+    # Embeddings
+    old_embeddings = embed_chunks(old_chunks)
+    new_embeddings = embed_chunks(new_chunks)
 
-    # 3️⃣ Generate embeddings
-    old_vectors = generate_embeddings(old_chunks)
-    new_vectors = generate_embeddings(new_chunks)
+    similarity_matrix = compute_similarity_matrix(old_embeddings, new_embeddings)
 
-    # 4️⃣ Compute similarity matrix
-    similarity_matrix = compute_similarity_matrix(old_vectors, new_vectors)
+    unchanged = 0
+    modified = 0
+    removed = 0
+    added = 0
 
-    # 5️⃣ Classify structural changes
-    unchanged, modified, removed, added = classify_drift(
-        old_chunks, new_chunks, similarity_matrix
-    )
+    matched_new_indices = set()
 
-    # 6️⃣ Compute structural drift percentage
-    drift_percentage = compute_drift_score(
+    for i, row in enumerate(similarity_matrix):
+        max_similarity = max(row)
+        max_index = row.tolist().index(max_similarity)
+
+        if max_similarity > 0.95:
+            unchanged += 1
+            matched_new_indices.add(max_index)
+        elif max_similarity > 0.75:
+            modified += 1
+            matched_new_indices.add(max_index)
+        else:
+            removed += 1
+
+    for j in range(len(new_chunks)):
+        if j not in matched_new_indices:
+            added += 1
+
+    structural_drift = compute_structural_drift(
         modified, removed, added, len(old_chunks)
     )
 
-    # 7️⃣ Print formatted report
-    print("\n--- Policy Drift Report ---")
-    print(f"Total Clauses (Old): {len(old_chunks)}")
-    print(f"Total Clauses (New): {len(new_chunks)}")
+    print("\n--- Structural Drift Report ---")
+    print(f"Unchanged: {unchanged}")
+    print(f"Modified : {modified}")
+    print(f"Removed  : {removed}")
+    print(f"Added    : {added}")
+    print(f"Structural Drift: {structural_drift}%")
 
-    print(f"\nUnchanged Clauses : {unchanged}")
-    print(f"Modified Clauses  : {modified}")
-    print(f"Removed Clauses   : {removed}")
-    print(f"Added Clauses     : {added}")
+    # ==============================
+    # LLM Semantic Risk Analysis
+    # ==============================
 
-    print(f"\nStructural Drift  : {drift_percentage}%")
+    print("\n--- LLM Semantic Risk Analysis ---")
 
-    return {
-        "unchanged": unchanged,
-        "modified": modified,
-        "removed": removed,
-        "added": added,
-        "structural_drift_percentage": drift_percentage
-    }
+    clause_results = []
+
+    for j in range(len(new_chunks)):
+        if j not in matched_new_indices:
+
+            new_clause = new_chunks[j]
+
+            result = analyze_clause_with_llm(
+                old_chunks,
+                new_clause
+            )
+
+            clause_results.append(result)
+
+            print("\nNEW CLAUSE:")
+            print(new_clause)
+            print(f"Risk Score: {result['risk_score']}")
+            print(f"Expansion: {result['expansion']}")
+            print(f"Reason: {result['reason']}")
+
+    semantic_score, semantic_level = aggregate_semantic_risk(
+        clause_results,
+        structural_drift
+    )
+
+    print("\nSemantic Risk Score:", semantic_score, "/10")
+    print("Semantic Risk Level:", semantic_level)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,88 @@
+WhatsApp Legal Info
+If you live outside the European Region or the UK, WhatsApp LLC ("WhatsApp," "our," "we," or "us") provides our Services to you under this Terms of Service and Privacy Policy.
+Our Privacy Policy ("Privacy Policy") helps explain our data practices, including the information we process to provide our Services.
+For example, our Privacy Policy talks about what information we collect and how this affects you. It also explains the steps we take to protect your privacy, like building our Services so delivered messages aren’t stored by us and giving you control over who you communicate with on our Services.
+We are one of the Meta Companies. You can learn more further below in this Privacy Policy about the ways in which we share information across this family of companies.
+This Privacy Policy applies to all of our Services unless specified otherwise.
+Please also read WhatsApp’s Terms of Service ("Terms"), which describe the terms under which you use and we provide our Services.
+
+Key Updates
+Respect for your privacy is coded into our DNA. Since we started WhatsApp, we’ve built our services with a set of strong privacy principles in mind.
+
+Information We Collect
+WhatsApp must receive or collect some information to operate, provide, improve, understand, customize, support, and market our Services, including when you install, access, or use our Services.
+
+Information You Provide
+Your Account Information. You must provide your mobile phone number and basic information (including a profile name of your choice) to create a WhatsApp account.
+
+Your Messages.
+We may retain certain messages and related metadata for analytics, service improvement, artificial intelligence training, safety monitoring, fraud prevention, and business optimization purposes, subject to applicable law and internal retention policies.
+
+Undelivered Messages.
+If a message cannot be delivered immediately (for example, if the recipient is offline), we keep it in encrypted form on our servers for up to 30 days as we try to deliver it.
+
+Media Forwarding.
+When a user forwards media within a message, we store that media temporarily in encrypted form on our servers to aid in more efficient delivery of additional forwards.
+
+Your Connections.
+You can use the contact upload feature and provide us with the phone numbers in your address book on a regular basis.
+
+Transactions And Payments Data.
+If you use our payments services, we process additional information about you, including payment account and transaction information.
+
+Automatically Collected Information
+
+Usage And Log Information.
+We collect information about your activity on our Services, including service-related, diagnostic, performance, and behavioral interaction information.
+
+Device And Connection Information.
+We collect device and connection-specific information when you install, access, or use our Services.
+
+Location Information.
+We collect and use precise location information from your device with your permission.
+
+Cookies.
+We use cookies to operate and provide our Services.
+
+Third-Party Service Providers.
+We work with third-party service providers and other Meta Companies to help us operate, provide, improve, understand, customize, support, and market our Services.
+
+Third-Party Services.
+We allow you to use our Services in connection with third-party services and Meta Company Products.
+
+How We Use Information
+We use information we have to operate, provide, improve, understand, customize, support, and market our Services.
+
+Business Interactions.
+Businesses may send you transaction, appointment, and shipping notifications; product and service updates; and marketing.
+
+Information You And We Share
+We share your information to help us operate, provide, improve, understand, customize, support, and market our Services.
+
+How We Work With Other Meta Companies
+As part of the Meta Companies, WhatsApp receives information from, and shares information with, the other Meta Companies.
+
+Assignment, Change Of Control, And Transfer
+In the event that we are involved in a merger, acquisition, restructuring, bankruptcy, or sale of assets, we will share your information with successor entities.
+
+Managing And Retaining Your Information
+We store information for as long as necessary for the purposes identified in this Privacy Policy, including to provide our Services or for other legitimate purposes.
+
+Law, Our Rights, And Protection
+We access, preserve, and share your information if we have a good-faith belief that it is necessary to comply with law, enforce our Terms, detect fraud, or protect safety.
+
+Our Global Operations
+WhatsApp shares information globally within the Meta Companies and externally with partners and service providers.
+
+Updates To Our Policy
+We may amend or update our Privacy Policy from time to time.
+
+Artificial Intelligence and Data Use.
+We may use user content, metadata, device information, behavioral interaction data, and communication patterns to develop, train, test, and improve machine learning models and artificial intelligence systems across Meta Company Products. Such processing may include automated profiling, cross-platform data analysis, behavioral prediction modeling, and long-term data aggregation for product enhancement and commercial optimization.
+
+Contact Us
+If you have questions or issues about our Privacy Policy, please contact us.
+WhatsApp LLC
+1 Meta Way
+Menlo Park, CA 94025
+United States of America

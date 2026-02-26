@@ -1,25 +1,15 @@
 import re
 
 
-def normalize_text(text: str) -> str:
-    """
-    Cleans raw policy text while preserving paragraph structure.
-    """
+def normalize_text(text):
 
-    if not text:
-        return ""
+    # Handle bytes from SQLite BLOB
+    if isinstance(text, bytes):
+        text = text.decode("utf-8", errors="ignore")
 
-    # 1️⃣ Normalize line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-
-    # 2️⃣ Remove excessive spaces
-    text = re.sub(r"[ \t]+", " ", text)
-
-    # 3️⃣ Remove multiple blank lines (keep max 1)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-
-    # 4️⃣ Strip leading/trailing whitespace
-    text = text.strip()
+    text = "\n".join(line.strip() for line in text.split("\n"))
+    text = "\n".join(line for line in text.split("\n") if line)
 
     return text
 
