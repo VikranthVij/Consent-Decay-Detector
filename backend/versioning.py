@@ -38,4 +38,4 @@ def get_earliest_and_latest(company_name):
 
     conn.close()
 
-    return earliest, latest
+    return earliest[0], latest[0]
