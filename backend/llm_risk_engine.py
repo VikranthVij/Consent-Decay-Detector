@@ -1,74 +1,62 @@
-import requests
+import os
 import json
+from google import genai
+from dotenv import load_dotenv
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL_NAME = "llama3"
+load_dotenv()
 
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError("GEMINI_API_KEY missing")
+
+client = genai.Client(api_key=api_key)
+
+MODEL = "gemini-2.0-flash"
 
 def analyze_clause_with_llm(old_clauses, new_clause):
-    """
-    Sends clause comparison to local Ollama LLM
-    Returns structured risk analysis
-    """
+
+    old_context = "\n".join(old_clauses[:10])
 
     prompt = f"""
-You are a privacy policy risk analysis system.
+Compare OLD and NEW privacy policy clauses.
 
-Compare the OLD policy clauses to the NEW clause below.
+OLD:
+{old_context}
 
-OLD POLICY:
-{old_clauses[:10]}  # truncated for context
-
-NEW CLAUSE:
+NEW:
 {new_clause}
 
-Determine:
-
-1. Does the NEW clause expand company rights?
-2. Does it introduce AI training, profiling, retention expansion, cross-platform sharing, or broader permissions?
-3. Assign a risk score from 0 to 10.
-4. Provide a short reason.
-
-Respond ONLY in valid JSON:
+Respond ONLY as valid JSON:
 
 {{
-  "risk_score": <number>,
-  "expansion": <true/false>,
-  "reason": "<short explanation>"
+  "risk_score": 0-10,
+  "expansion": true/false,
+  "reason": "short explanation"
 }}
 """
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL_NAME,
-                "prompt": prompt,
-                "stream": False
-            },
-            timeout=120
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=prompt,   # ✅ SIMPLE STRING
         )
 
-        raw_output = response.json()["response"]
+        text = response.text.strip()
 
-        # Try parsing JSON safely
-        try:
-            result = json.loads(raw_output)
-        except:
-            # Fallback parsing if model adds extra text
-            start = raw_output.find("{")
-            end = raw_output.rfind("}") + 1
-            result = json.loads(raw_output[start:end])
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        data = json.loads(text[start:end])
 
         return {
-            "risk_score": int(result.get("risk_score", 0)),
-            "expansion": bool(result.get("expansion", False)),
-            "reason": result.get("reason", "No explanation provided.")
+            "risk_score": int(data.get("risk_score", 0)),
+            "expansion": bool(data.get("expansion", False)),
+            "reason": data.get("reason", ""),
         }
 
     except Exception as e:
         return {
             "risk_score": 0,
             "expansion": False,
-            "reason": f"LLM error: {str(e)}"
+            "reason": f"Gemini error: {str(e)}",
         }
