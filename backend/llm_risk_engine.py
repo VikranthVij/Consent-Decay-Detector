@@ -1,44 +1,74 @@
 import requests
 import json
+import re
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL_NAME = "llama3"
 
 
+# -------------------------------
+# Rule-Based Signal Extraction
+# -------------------------------
+
+RULE_SIGNALS = {
+    "ai_training": ["train", "machine learning", "artificial intelligence"],
+    "profiling": ["profiling", "behavioral prediction"],
+    "cross_platform_sharing": ["across products", "cross-platform"],
+    "data_aggregation": ["aggregate", "long-term data aggregation"],
+    "retention_expansion": ["retain", "retention"]
+}
+
+
+def extract_rule_categories(text):
+    text_lower = text.lower()
+    categories = []
+
+    for category, keywords in RULE_SIGNALS.items():
+        for keyword in keywords:
+            if keyword in text_lower:
+                categories.append(category)
+                break
+
+    return categories
+
+
+# -------------------------------
+# Safe JSON Extraction
+# -------------------------------
+
+def safe_extract_json(text):
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return None
+
+
+# -------------------------------
+# Hybrid LLM + Rule Analysis
+# -------------------------------
+
 def analyze_clause_with_llm(old_clauses, new_clause):
 
-    old_context = "\n".join(old_clauses[:10])
+    rule_categories = extract_rule_categories(new_clause)
 
     prompt = f"""
 You are a privacy policy risk analysis system.
 
-Compare OLD and NEW clauses.
+Compare OLD policy clauses to NEW clause.
 
-OLD:
-{old_context}
+OLD POLICY:
+{old_clauses[:10]}
 
-NEW:
+NEW CLAUSE:
 {new_clause}
 
-Determine:
-
-1. Does the NEW clause expand company rights?
-2. Assign risk score (0-10).
-3. Identify categories if present:
-   - ai_training
-   - profiling
-   - retention_expansion
-   - cross_platform_sharing
-   - data_aggregation
-4. Provide short explanation.
-
-Respond ONLY as valid JSON:
+Return ONLY valid JSON:
 
 {{
-  "risk_score": <number>,
-  "expansion": <true/false>,
-  "categories": ["ai_training", "profiling", ...],
-  "reason": "<short explanation>"
+  "risk_score": number (0-10),
+  "expansion": true/false,
+  "categories": [list of risk categories],
+  "reason": "short explanation"
 }}
 """
 
@@ -55,24 +85,26 @@ Respond ONLY as valid JSON:
 
         raw_output = response.json()["response"]
 
-        try:
-            result = json.loads(raw_output)
-        except:
-            start = raw_output.find("{")
-            end = raw_output.rfind("}") + 1
-            result = json.loads(raw_output[start:end])
+        parsed = safe_extract_json(raw_output)
+
+        if not parsed:
+            raise ValueError("Invalid JSON from LLM")
+
+        llm_categories = parsed.get("categories", [])
+
+        final_categories = list(set(rule_categories + llm_categories))
 
         return {
-            "risk_score": int(result.get("risk_score", 0)),
-            "expansion": bool(result.get("expansion", False)),
-            "categories": result.get("categories", []),
-            "reason": result.get("reason", "No explanation provided.")
+            "risk_score": int(parsed.get("risk_score", 0)),
+            "expansion": bool(parsed.get("expansion", False)),
+            "categories": final_categories,
+            "reason": parsed.get("reason", "")
         }
 
     except Exception as e:
         return {
             "risk_score": 0,
             "expansion": False,
-            "categories": [],
+            "categories": rule_categories,
             "reason": f"LLM error: {str(e)}"
         }

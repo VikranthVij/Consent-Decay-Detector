@@ -1,11 +1,12 @@
 import sqlite3
+import sys
 import json
+
 from backend.database import DB_PATH
 from backend.text_processing import normalize_text
 from backend.chunking import chunk_text
 from backend.embedding_engine import embed_chunks, compute_similarity_matrix
 from backend.llm_risk_engine import analyze_clause_with_llm
-from backend.expansion_signal_engine import extract_expansion_signals
 
 
 # ==============================
@@ -52,8 +53,7 @@ def aggregate_semantic_risk(clause_results, structural_drift):
 
     structural_multiplier = 1 + (structural_drift / 200)
 
-    final_score = base_score * structural_multiplier
-    final_score = min(round(final_score, 2), 10)
+    final_score = min(round(base_score * structural_multiplier, 2), 10)
 
     if final_score >= 7:
         level = "HIGH"
@@ -69,7 +69,7 @@ def aggregate_semantic_risk(clause_results, structural_drift):
 # Policy Drift Engine
 # ==============================
 
-def compute_policy_drift(company_name):
+def compute_policy_drift(company_name, mode="incremental"):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -83,23 +83,60 @@ def compute_policy_drift(company_name):
 
     company_id = company[0]
 
-    cursor.execute("""
-        SELECT content FROM policy_versions
-        WHERE company_id=?
-        ORDER BY timestamp DESC
-        LIMIT 2
-    """, (company_id,))
+    # ---------------------------
+    # VERSION SELECTION
+    # ---------------------------
 
-    versions = cursor.fetchall()
+    if mode == "baseline":
 
-    if len(versions) < 2:
-        print("Not enough versions to compare.")
-        return
+        cursor.execute("""
+            SELECT content FROM policy_versions
+            WHERE company_id=?
+            ORDER BY timestamp ASC
+            LIMIT 1
+        """, (company_id,))
+        oldest = cursor.fetchone()
 
-    new_text = versions[0][0]
-    old_text = versions[1][0]
+        cursor.execute("""
+            SELECT content FROM policy_versions
+            WHERE company_id=?
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """, (company_id,))
+        newest = cursor.fetchone()
+
+        if not oldest or not newest:
+            print("Not enough versions to compare.")
+            return
+
+        old_text = oldest[0]
+        new_text = newest[0]
+
+    else:  # incremental
+
+        cursor.execute("""
+            SELECT content FROM policy_versions
+            WHERE company_id=?
+            ORDER BY timestamp DESC
+            LIMIT 2
+        """, (company_id,))
+
+        versions = cursor.fetchall()
+
+        if len(versions) < 2:
+            print("Not enough versions to compare.")
+            return
+
+        new_text = versions[0][0]
+        old_text = versions[1][0]
 
     conn.close()
+
+    print(f"\nComparison Mode: {mode.upper()}")
+
+    # ---------------------------
+    # Normalize + Chunk
+    # ---------------------------
 
     old_clean = normalize_text(old_text)
     new_clean = normalize_text(new_text)
@@ -107,8 +144,12 @@ def compute_policy_drift(company_name):
     old_chunks = chunk_text(old_clean)
     new_chunks = chunk_text(new_clean)
 
-    print(f"\nOld Chunks: {len(old_chunks)}")
+    print(f"Old Chunks: {len(old_chunks)}")
     print(f"New Chunks: {len(new_chunks)}")
+
+    # ---------------------------
+    # Embeddings + Similarity
+    # ---------------------------
 
     old_embeddings = embed_chunks(old_chunks)
     new_embeddings = embed_chunks(new_chunks)
@@ -150,6 +191,10 @@ def compute_policy_drift(company_name):
     print(f"Added    : {added}")
     print(f"Structural Drift: {structural_drift}%")
 
+    # ---------------------------
+    # Hybrid Semantic Analysis
+    # ---------------------------
+
     print("\n--- Hybrid LLM Semantic Risk Analysis ---")
 
     clause_results = []
@@ -159,60 +204,54 @@ def compute_policy_drift(company_name):
 
             new_clause = new_chunks[j]
 
-            rule_categories = extract_expansion_signals(new_clause)
-
-            result = analyze_clause_with_llm(
-                old_chunks,
-                new_clause
-            )
-
-            llm_categories = result.get("categories", [])
-
-            # Hybrid Alignment
-            combined_categories = list(set(rule_categories + llm_categories))
-            implicit_categories = [
-                cat for cat in llm_categories if cat not in rule_categories
-            ]
-
-            if implicit_categories:
-                result["risk_score"] = min(result["risk_score"] + 1, 10)
-
-            result["rule_categories"] = rule_categories
-            result["llm_categories"] = llm_categories
-            result["final_categories"] = combined_categories
-            result["clause"] = new_clause
+            result = analyze_clause_with_llm(old_chunks, new_clause)
 
             clause_results.append(result)
 
             print("\nNEW CLAUSE:")
             print(new_clause)
-            print("Rule Categories:", rule_categories)
-            print("LLM Categories:", llm_categories)
-            print("Final Categories:", combined_categories)
-            print("Risk Score:", result["risk_score"])
-            print("Expansion:", result["expansion"])
-            print("Reason:", result["reason"])
+            print(f"Risk Score: {result['risk_score']}")
+            print(f"Expansion: {result['expansion']}")
+            print(f"Categories: {result.get('categories', [])}")
+            print(f"Reason: {result['reason']}")
 
     semantic_score, semantic_level = aggregate_semantic_risk(
         clause_results,
         structural_drift
     )
 
+    print("\nSemantic Risk Score:", semantic_score, "/10")
+    print("Semantic Risk Level:", semantic_level)
+
     final_report = {
         "company": company_name,
+        "mode": mode,
         "structural_drift": structural_drift,
         "semantic_score": semantic_score,
         "risk_level": semantic_level,
         "total_new_clauses": len(clause_results),
-        "high_risk_clauses": [
-            c for c in clause_results if c["risk_score"] >= 7
-        ],
-        "all_new_clauses": clause_results,
+        "all_new_clauses": clause_results
     }
 
     print("\n--- Final Risk Report ---")
     print(json.dumps(final_report, indent=2))
 
 
+# ==============================
+# CLI ENTRY POINT
+# ==============================
+
 if __name__ == "__main__":
-    compute_policy_drift("WhatsApp")
+
+    if len(sys.argv) < 3:
+        print("Usage: python -m backend.drift_engine <CompanyName> <baseline|incremental>")
+        sys.exit(1)
+
+    company_name = sys.argv[1]
+    mode = sys.argv[2].lower()
+
+    if mode not in ["baseline", "incremental"]:
+        print("Mode must be 'baseline' or 'incremental'")
+        sys.exit(1)
+
+    compute_policy_drift(company_name, mode)
