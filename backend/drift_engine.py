@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from backend.database import DB_PATH
 from backend.text_processing import normalize_text
 from backend.chunking import chunk_text
@@ -28,7 +29,7 @@ def compute_structural_drift(modified, removed, added, total_old):
 
 
 # ==============================
-# NEW Semantic Risk Aggregation
+# Semantic Risk Aggregation
 # ==============================
 
 def aggregate_semantic_risk(clause_results, structural_drift):
@@ -42,22 +43,20 @@ def aggregate_semantic_risk(clause_results, structural_drift):
     high_risk_count = len([s for s in scores if s >= 7])
     medium_risk_count = len([s for s in scores if 4 <= s < 7])
 
-    # --- Weighted Model ---
+    # Weighted model
     base_score = (
-        max_risk * 0.5 +             # Worst clause dominates
-        high_risk_count * 0.7 +      # Multiple high-risk clauses amplify
-        medium_risk_count * 0.3      # Moderate accumulation
+        max_risk * 0.5 +
+        high_risk_count * 0.7 +
+        medium_risk_count * 0.3
     )
 
     # Structural amplification
     structural_multiplier = 1 + (structural_drift / 200)
-
     final_score = base_score * structural_multiplier
 
-    # Normalize to 0–10 scale
+    # Normalize to 0–10
     final_score = min(round(final_score, 2), 10)
 
-    # Risk Level Classification
     if final_score >= 7:
         level = "HIGH"
     elif final_score >= 4:
@@ -176,7 +175,12 @@ def compute_policy_drift(company_name):
                 new_clause
             )
 
-            clause_results.append(result)
+            clause_results.append({
+                "clause": new_clause,
+                "risk_score": result["risk_score"],
+                "expansion": result["expansion"],
+                "reason": result["reason"]
+            })
 
             print("\nNEW CLAUSE:")
             print(new_clause)
@@ -191,6 +195,29 @@ def compute_policy_drift(company_name):
 
     print("\nSemantic Risk Score:", semantic_score, "/10")
     print("Semantic Risk Level:", semantic_level)
+
+    # ==============================
+    # Final Structured Output
+    # ==============================
+
+    high_risk_clauses = [
+        c for c in clause_results if c["risk_score"] >= 7
+    ]
+
+    final_output = {
+        "company": company_name,
+        "structural_drift": structural_drift,
+        "semantic_score": semantic_score,
+        "risk_level": semantic_level,
+        "total_new_clauses": len(clause_results),
+        "high_risk_clauses": high_risk_clauses,
+        "all_new_clauses": clause_results
+    }
+
+    print("\n--- Final Risk Report ---")
+    print(json.dumps(final_output, indent=2))
+
+    return final_output
 
 
 if __name__ == "__main__":
