@@ -1,74 +1,31 @@
 import sqlite3
-import json
-from collections import defaultdict
 from backend.database import DB_PATH
 from backend.text_processing import normalize_text
 from backend.chunking import chunk_text
 from backend.embedding_engine import embed_chunks, compute_similarity_matrix
 from backend.llm_risk_engine import analyze_clause_with_llm
-from backend.drift_engine import compute_structural_drift, aggregate_semantic_risk
 
 
-CATEGORY_BASE_WEIGHTS = {
-    "ai_training": 3,
-    "profiling": 3,
-    "cross_platform_sharing": 2,
-    "data_aggregation": 2,
-    "retention_expansion": 2,
-    "third_party_sharing": 2,
-    "automated_decision_making": 3,
-    "historical_data_reclassification": 4,
-}
+def compute_structural_drift(modified, removed, added, total_old):
+    if total_old == 0:
+        return 0.0
+
+    return round(
+        ((modified * 0.4) + (removed * 0.3) + (added * 0.3)) / total_old * 100,
+        2
+    )
 
 
-def compute_category_severity(clause_results):
+def compute_escalation_intensity(previous_categories, current_categories):
+    intensity = 0
 
-    category_counts = defaultdict(int)
-    category_risk_sum = defaultdict(int)
+    for category, current_value in current_categories.items():
+        prev_value = previous_categories.get(category, 0)
+        if current_value > prev_value:
+            intensity += (current_value - prev_value)
 
-    for result in clause_results:
-        risk = result.get("risk_score", 0)
-        categories = result.get("categories", [])
-
-        for cat in categories:
-            category_counts[cat] += 1
-            category_risk_sum[cat] += risk
-
-    severity_map = {}
-
-    for cat, count in category_counts.items():
-
-        base = CATEGORY_BASE_WEIGHTS.get(cat, 1)
-        avg_risk = category_risk_sum[cat] / count if count else 0
-
-        amplification = 0
-
-        if count > 1:
-            amplification += 1
-
-        if avg_risk >= 7:
-            amplification += 1
-
-        severity = min(base + amplification, 4)
-        severity_map[cat] = severity
-
-    return severity_map
-
-
-def detect_escalation(previous_map, current_map):
-
-    escalations = {}
-
-    for cat, current_strength in current_map.items():
-        previous_strength = previous_map.get(cat, 0)
-
-        if current_strength > previous_strength:
-            escalations[cat] = {
-                "previous": previous_strength,
-                "current": current_strength
-            }
-
-    return escalations
+    # normalize to 0–10 scale
+    return min(round(intensity, 2), 10)
 
 
 def compute_timeline_drift(company_name, return_data=False):
@@ -86,16 +43,24 @@ def compute_timeline_drift(company_name, return_data=False):
     company_id = company[0]
 
     cursor.execute("""
-    SELECT content, timestamp FROM policy_versions
-    WHERE company_id=?
-    ORDER BY timestamp ASC
+        SELECT content, timestamp FROM policy_versions
+        WHERE company_id=?
+        ORDER BY timestamp ASC
     """, (company_id,))
 
     versions = cursor.fetchall()
     conn.close()
 
-    timeline_summary = []
-    previous_severity_map = {}
+    if len(versions) < 2:
+        print("Not enough versions.")
+        return
+
+    timeline_results = []
+    cumulative_cdi = 0
+    previous_categories = {}
+
+    print(f"\nTimeline Drift Analysis for {company_name}")
+    print("=" * 70)
 
     for i in range(1, len(versions)):
 
@@ -113,55 +78,79 @@ def compute_timeline_drift(company_name, return_data=False):
 
         similarity_matrix = compute_similarity_matrix(old_embeddings, new_embeddings)
 
-        modified = removed = added = 0
+        unchanged = modified = removed = 0
         matched_new_indices = set()
 
         for row in similarity_matrix:
             max_similarity = max(row)
             max_index = row.tolist().index(max_similarity)
 
-            if max_similarity > 0.75:
+            if max_similarity > 0.95:
+                unchanged += 1
+                matched_new_indices.add(max_index)
+            elif max_similarity > 0.75:
                 modified += 1
                 matched_new_indices.add(max_index)
             else:
                 removed += 1
 
-        for j in range(len(new_chunks)):
-            if j not in matched_new_indices:
-                added += 1
+        added = len(new_chunks) - len(matched_new_indices)
 
         structural_drift = compute_structural_drift(
             modified, removed, added, len(old_chunks)
         )
 
         clause_results = []
+        category_severity = {}
 
         for j in range(len(new_chunks)):
             if j not in matched_new_indices:
                 result = analyze_clause_with_llm(old_chunks, new_chunks[j])
                 clause_results.append(result)
 
-        semantic_score, semantic_level = aggregate_semantic_risk(
-            clause_results,
-            structural_drift
+                for cat in result.get("categories", []):
+                    category_severity[cat] = max(
+                        category_severity.get(cat, 0),
+                        result.get("risk_score", 0) // 2
+                    )
+
+        semantic_score = (
+            sum([c["risk_score"] for c in clause_results]) / len(clause_results)
+            if clause_results else 0
         )
 
-        current_severity_map = compute_category_severity(clause_results)
-        escalations = detect_escalation(previous_severity_map, current_severity_map)
+        escalation_intensity = compute_escalation_intensity(
+            previous_categories,
+            category_severity
+        )
 
-        timeline_summary.append({
+        # ΔR(t)
+        delta_risk = (
+            0.3 * structural_drift +
+            0.5 * semantic_score +
+            0.2 * escalation_intensity
+        )
+
+        cumulative_cdi = min(round(cumulative_cdi + delta_risk, 2), 100)
+
+        previous_categories = category_severity
+
+        print(f"\n{old_time} → {new_time}")
+        print(f"Structural Drift: {structural_drift}%")
+        print(f"Semantic Risk: {round(semantic_score,2)}/10")
+        print(f"Escalation Intensity: {escalation_intensity}")
+        print(f"Consent Decay Index (CDI): {cumulative_cdi}/100")
+
+        timeline_results.append({
             "from": old_time,
             "to": new_time,
             "structural_drift": structural_drift,
-            "semantic_score": semantic_score,
-            "risk_level": semantic_level,
-            "categories": current_severity_map,
-            "escalations": escalations
+            "semantic_score": round(semantic_score, 2),
+            "escalation_intensity": escalation_intensity,
+            "cdi": cumulative_cdi
         })
 
-        previous_severity_map = current_severity_map
+    print("\n" + "=" * 70)
 
     if return_data:
-        return timeline_summary
-
-    print(json.dumps(timeline_summary, indent=2))
+        return timeline_results
