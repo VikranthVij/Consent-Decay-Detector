@@ -6,34 +6,38 @@ MODEL_NAME = "llama3"
 
 
 def analyze_clause_with_llm(old_clauses, new_clause):
-    """
-    Sends clause comparison to local Ollama LLM
-    Returns structured risk analysis
-    """
+
+    old_context = "\n".join(old_clauses[:10])
 
     prompt = f"""
 You are a privacy policy risk analysis system.
 
-Compare the OLD policy clauses to the NEW clause below.
+Compare OLD and NEW clauses.
 
-OLD POLICY:
-{old_clauses[:10]}  # truncated for context
+OLD:
+{old_context}
 
-NEW CLAUSE:
+NEW:
 {new_clause}
 
 Determine:
 
 1. Does the NEW clause expand company rights?
-2. Does it introduce AI training, profiling, retention expansion, cross-platform sharing, or broader permissions?
-3. Assign a risk score from 0 to 10.
-4. Provide a short reason.
+2. Assign risk score (0-10).
+3. Identify categories if present:
+   - ai_training
+   - profiling
+   - retention_expansion
+   - cross_platform_sharing
+   - data_aggregation
+4. Provide short explanation.
 
-Respond ONLY in valid JSON:
+Respond ONLY as valid JSON:
 
 {{
   "risk_score": <number>,
   "expansion": <true/false>,
+  "categories": ["ai_training", "profiling", ...],
   "reason": "<short explanation>"
 }}
 """
@@ -51,11 +55,9 @@ Respond ONLY in valid JSON:
 
         raw_output = response.json()["response"]
 
-        # Try parsing JSON safely
         try:
             result = json.loads(raw_output)
         except:
-            # Fallback parsing if model adds extra text
             start = raw_output.find("{")
             end = raw_output.rfind("}") + 1
             result = json.loads(raw_output[start:end])
@@ -63,6 +65,7 @@ Respond ONLY in valid JSON:
         return {
             "risk_score": int(result.get("risk_score", 0)),
             "expansion": bool(result.get("expansion", False)),
+            "categories": result.get("categories", []),
             "reason": result.get("reason", "No explanation provided.")
         }
 
@@ -70,5 +73,6 @@ Respond ONLY in valid JSON:
         return {
             "risk_score": 0,
             "expansion": False,
+            "categories": [],
             "reason": f"LLM error: {str(e)}"
         }
