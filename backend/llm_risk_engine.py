@@ -6,16 +6,68 @@ OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL_NAME = "llama3"
 
 
-# -------------------------------
+# ==========================================
+# Controlled Risk Ontology
+# ==========================================
+
+ALLOWED_CATEGORIES = {
+    "ai_training",
+    "profiling",
+    "cross_platform_sharing",
+    "data_aggregation",
+    "retention_expansion",
+    "third_party_sharing",
+    "automated_decision_making",
+    "historical_data_reclassification"
+}
+
+
+# ==========================================
 # Rule-Based Signal Extraction
-# -------------------------------
+# ==========================================
 
 RULE_SIGNALS = {
-    "ai_training": ["train", "machine learning", "artificial intelligence"],
-    "profiling": ["profiling", "behavioral prediction"],
-    "cross_platform_sharing": ["across products", "cross-platform"],
-    "data_aggregation": ["aggregate", "long-term data aggregation"],
-    "retention_expansion": ["retain", "retention"]
+    "ai_training": [
+        "train",
+        "machine learning",
+        "artificial intelligence",
+        "improve models"
+    ],
+    "profiling": [
+        "profiling",
+        "behavioral prediction",
+        "automated profiling"
+    ],
+    "cross_platform_sharing": [
+        "across products",
+        "cross-platform",
+        "meta company products"
+    ],
+    "data_aggregation": [
+        "aggregate",
+        "aggregation",
+        "long-term data aggregation"
+    ],
+    "retention_expansion": [
+        "retain",
+        "retention",
+        "store for extended period"
+    ],
+    "third_party_sharing": [
+        "third party",
+        "third-party",
+        "external partners"
+    ],
+    "automated_decision_making": [
+        "automated decision",
+        "automated processing",
+        "algorithmic decision"
+    ],
+    "historical_data_reclassification": [
+        "historical data",
+        "past interactions",
+        "previously collected data"
+    ]
 }
 
 
@@ -32,23 +84,27 @@ def extract_rule_categories(text):
     return categories
 
 
-# -------------------------------
+# ==========================================
 # Safe JSON Extraction
-# -------------------------------
+# ==========================================
 
 def safe_extract_json(text):
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
-        return json.loads(match.group())
+        try:
+            return json.loads(match.group())
+        except:
+            return None
     return None
 
 
-# -------------------------------
+# ==========================================
 # Hybrid LLM + Rule Analysis
-# -------------------------------
+# ==========================================
 
 def analyze_clause_with_llm(old_clauses, new_clause):
 
+    # Rule-based categories
     rule_categories = extract_rule_categories(new_clause)
 
     prompt = f"""
@@ -62,12 +118,22 @@ OLD POLICY:
 NEW CLAUSE:
 {new_clause}
 
+Allowed categories:
+- ai_training
+- profiling
+- cross_platform_sharing
+- data_aggregation
+- retention_expansion
+- third_party_sharing
+- automated_decision_making
+- historical_data_reclassification
+
 Return ONLY valid JSON:
 
 {{
   "risk_score": number (0-10),
   "expansion": true/false,
-  "categories": [list of risk categories],
+  "categories": [list from allowed categories only],
   "reason": "short explanation"
 }}
 """
@@ -90,8 +156,13 @@ Return ONLY valid JSON:
         if not parsed:
             raise ValueError("Invalid JSON from LLM")
 
-        llm_categories = parsed.get("categories", [])
+        # Filter LLM categories to allowed ontology only
+        llm_categories = [
+            cat for cat in parsed.get("categories", [])
+            if cat in ALLOWED_CATEGORIES
+        ]
 
+        # Merge rule + LLM categories
         final_categories = list(set(rule_categories + llm_categories))
 
         return {

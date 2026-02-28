@@ -16,15 +16,12 @@ from backend.llm_risk_engine import analyze_clause_with_llm
 
 def compare_versions(old_text, new_text):
 
-    # Normalize
     old_clean = normalize_text(old_text)
     new_clean = normalize_text(new_text)
 
-    # Chunk
     old_chunks = chunk_text(old_clean)
     new_chunks = chunk_text(new_clean)
 
-    # Embeddings
     old_embeddings = embed_chunks(old_chunks)
     new_embeddings = embed_chunks(new_chunks)
 
@@ -58,13 +55,16 @@ def compare_versions(old_text, new_text):
         modified, removed, added, len(old_chunks)
     )
 
-    # Semantic Risk Analysis
     clause_results = []
+    all_categories = set()
 
     for j in range(len(new_chunks)):
         if j not in matched_new_indices:
             result = analyze_clause_with_llm(old_chunks, new_chunks[j])
             clause_results.append(result)
+
+            for cat in result.get("categories", []):
+                all_categories.add(cat)
 
     semantic_score, semantic_level = aggregate_semantic_risk(
         clause_results,
@@ -75,12 +75,12 @@ def compare_versions(old_text, new_text):
         "structural_drift": structural_drift,
         "semantic_score": semantic_score,
         "risk_level": semantic_level,
-        "total_new_clauses": len(clause_results)
+        "categories": list(all_categories)
     }
 
 
 # ==========================================
-# Timeline Drift Engine
+# Timeline Drift Engine with Category Tracking
 # ==========================================
 
 def compute_timeline_drift(company_name):
@@ -112,39 +112,39 @@ def compute_timeline_drift(company_name):
         return
 
     print(f"\nTimeline Drift Analysis for {company_name}")
-    print("=" * 60)
+    print("=" * 70)
 
-    timeline_results = []
+    seen_categories = set()
 
     for i in range(1, len(versions)):
 
         old_text, old_time = versions[i - 1]
         new_text, new_time = versions[i]
 
-        print(f"\nComparing:")
-        print(f"{old_time}  →  {new_time}")
-
         result = compare_versions(old_text, new_text)
 
+        new_categories = set(result["categories"])
+        first_introduced = new_categories - seen_categories
+
+        seen_categories.update(new_categories)
+
+        print(f"\n{old_time}  →  {new_time}")
         print(f"Structural Drift: {result['structural_drift']}%")
         print(f"Semantic Risk: {result['semantic_score']}/10")
         print(f"Risk Level: {result['risk_level']}")
-        print(f"New Clauses: {result['total_new_clauses']}")
+        print(f"Categories Detected: {result['categories']}")
 
-        timeline_results.append({
-            "from": old_time,
-            "to": new_time,
-            **result
-        })
+        if first_introduced:
+            print("⚠ First Introduction Detected:")
+            for cat in first_introduced:
+                print(f"   - {cat}")
 
-    print("\n" + "=" * 60)
-    print("Timeline Summary (JSON)")
-    print("=" * 60)
-    print(json.dumps(timeline_results, indent=2))
+    print("\n" + "=" * 70)
+    print("End of Timeline Analysis")
 
 
 # ==========================================
-# CLI ENTRY POINT
+# CLI ENTRY
 # ==========================================
 
 if __name__ == "__main__":
@@ -153,5 +153,4 @@ if __name__ == "__main__":
         print("Usage: python -m backend.timeline_engine <CompanyName>")
         sys.exit(1)
 
-    company_name = sys.argv[1]
-    compute_timeline_drift(company_name)
+    compute_timeline_drift(sys.argv[1])
