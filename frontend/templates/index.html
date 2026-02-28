@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consent Decay Detector</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <div class="logo-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <div class="logo-text">
+                <span class="logo-title">CDD</span>
+                <span class="logo-subtitle">Consent Decay Detector</span>
+            </div>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item" data-section="analysis" onclick="navigateTo('analysis')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Drift Analysis</span>
+        </a>
+        <a href="#" class="nav-item" data-section="timeline" onclick="navigateTo('timeline')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Timeline</span>
+        </a>
+        <a href="#" class="nav-item" data-section="scanner" onclick="navigateTo('scanner')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Policy Scanner</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-text">AMD Hackathon 2026</div>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="main-content" id="mainContent">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+        <button class="menu-toggle" onclick="toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <div class="topbar-actions">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span class="status-text">System Ready</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Section -->
+    <section class="content-section active" id="section-dashboard">
+        <div class="section-header">
+            <h2>Tracked Companies</h2>
+            <p class="section-desc">Monitor policy changes across registered platforms</p>
+        </div>
+
+        <div class="company-grid" id="companyGrid">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading companies...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Analysis Section -->
+    <section class="content-section" id="section-analysis">
+        <div class="section-header">
+            <h2>Drift Analysis</h2>
+            <p class="section-desc">Semantic and structural drift comparison</p>
+        </div>
+
+        <div class="analysis-controls">
+            <div class="select-wrapper">
+                <select id="analysisCompanySelect" onchange="onAnalysisCompanyChange()">
+                    <option value="">Select a company...</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="runDriftBtn" onclick="runDriftAnalysis()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Run Full Analysis
+            </button>
+            <button class="btn btn-secondary" id="runQuickBtn" onclick="runQuickStats()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Quick Stats
+            </button>
+        </div>
+
+        <!-- Quick Stats Results -->
+        <div id="quickStatsResults" class="hidden">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="panel" id="chunkBreakdownPanel">
+                <div class="panel-header">
+                    <h3>Clause Breakdown</h3>
+                </div>
+                <div class="panel-body">
+                    <canvas id="chunkChart" height="280"></canvas>
+                </div>
+            </div>
+
+            <div class="two-col">
+                <div class="panel" id="expansionSignalsPanel">
+                    <div class="panel-header">
+                        <h3>Expansion Signals Detected</h3>
+                    </div>
+                    <div class="panel-body" id="expansionSignalsList"></div>
+                </div>
+                <div class="panel" id="newClausesPanel">
+                    <div class="panel-header">
+                        <h3>New Clauses</h3>
+                        <span class="badge" id="newClauseCount">0</span>
+                    </div>
+                    <div class="panel-body clause-list" id="newClausesList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Drift Results -->
+        <div id="driftResults" class="hidden">
+            <div class="stats-grid" id="driftStatsGrid"></div>
+
+            <div class="two-col">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Baseline Analysis</h3>
+                        <span class="badge" id="baselineRiskBadge">-</span>
+                    </div>
+                    <div class="panel-body" id="baselineResults"></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>Incremental Analysis</h3>
+                        <span class="badge" id="incrementalRiskBadge">-</span>
+                    </div>
+                    <div class="panel-body" id="incrementalResults"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Flagged Clauses</h3>
+                </div>
+                <div class="panel-body clause-list" id="flaggedClausesList"></div>
+            </div>
+        </div>
+
+        <div id="analysisLoading" class="hidden">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p id="analysisLoadingText">Running analysis...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Timeline Section -->
+    <section class="content-section" id="section-timeline">
+        <div class="section-header">
+            <h2>Timeline Analysis</h2>
+            <p class="section-desc">Track consent erosion across policy versions</p>
+        </div>
+
+        <div class="analysis-controls">
+            <div class="select-wrapper">
+                <select id="timelineCompanySelect" onchange="onTimelineCompanyChange()">
+                    <option value="">Select a company...</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="runTimelineBtn" onclick="runTimelineAnalysis()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Run Timeline Analysis
+            </button>
+        </div>
+
+        <div id="timelineResults" class="hidden">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Consent Decay Index (CDI) Over Time</h3>
+                </div>
+                <div class="panel-body">
+                    <canvas id="cdiChart" height="300"></canvas>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Version Transitions</h3>
+                </div>
+                <div class="panel-body" id="transitionsList"></div>
+            </div>
+        </div>
+
+        <div id="timelineLoading" class="hidden">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Running timeline analysis (this may take a while)...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scanner Section -->
+    <section class="content-section" id="section-scanner">
+        <div class="section-header">
+            <h2>Policy Scanner</h2>
+            <p class="section-desc">Paste any privacy policy text to scan for expansion signals</p>
+        </div>
+
+        <div class="scanner-layout">
+            <div class="panel scanner-input-panel">
+                <div class="panel-header">
+                    <h3>Policy Text Input</h3>
+                </div>
+                <div class="panel-body">
+                    <textarea id="scannerInput" placeholder="Paste privacy policy text here..." rows="16"></textarea>
+                    <button class="btn btn-primary btn-full" onclick="runScanner()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        Scan Policy
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel scanner-results-panel">
+                <div class="panel-header">
+                    <h3>Scan Results</h3>
+                </div>
+                <div class="panel-body" id="scannerResults">
+                    <div class="empty-state">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <p>Paste a policy and click scan to see results</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>
