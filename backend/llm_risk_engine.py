@@ -89,13 +89,25 @@ def extract_rule_categories(text):
 # ==========================================
 
 def safe_extract_json(text):
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except:
-            return None
-    return None
+
+    # Remove markdown fences
+    text = text.replace("```json", "").replace("```", "").strip()
+
+    # Extract first JSON block (non-greedy)
+    match = re.search(r"\{.*?\}", text, re.DOTALL)
+    if not match:
+        return None
+
+    json_candidate = match.group(0)
+
+    # Remove trailing commas
+    json_candidate = re.sub(r",\s*}", "}", json_candidate)
+    json_candidate = re.sub(r",\s*]", "]", json_candidate)
+
+    try:
+        return json.loads(json_candidate)
+    except json.JSONDecodeError:
+        return None
 
 
 # ==========================================

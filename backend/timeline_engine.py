@@ -6,6 +6,10 @@ from backend.embedding_engine import embed_chunks, compute_similarity_matrix
 from backend.llm_risk_engine import analyze_clause_with_llm
 
 
+# ==============================
+# Structural Drift
+# ==============================
+
 def compute_structural_drift(modified, removed, added, total_old):
     if total_old == 0:
         return 0.0
@@ -16,6 +20,10 @@ def compute_structural_drift(modified, removed, added, total_old):
     )
 
 
+# ==============================
+# Escalation Intensity
+# ==============================
+
 def compute_escalation_intensity(previous_categories, current_categories):
     intensity = 0
 
@@ -24,9 +32,32 @@ def compute_escalation_intensity(previous_categories, current_categories):
         if current_value > prev_value:
             intensity += (current_value - prev_value)
 
-    # normalize to 0–10 scale
     return min(round(intensity, 2), 10)
 
+
+# ==============================
+# Irreversibility Detection
+# ==============================
+
+IRREVERSIBLE_CATEGORIES = {
+    "ai_training",
+    "historical_data_reclassification",
+    "profiling",
+    "cross_platform_sharing",
+    "automated_decision_making"
+}
+
+
+def is_irreversible(category_severity):
+    for cat in category_severity.keys():
+        if cat in IRREVERSIBLE_CATEGORIES:
+            return True
+    return False
+
+
+# ==============================
+# Timeline Drift + CDI
+# ==============================
 
 def compute_timeline_drift(company_name, return_data=False):
 
@@ -60,7 +91,7 @@ def compute_timeline_drift(company_name, return_data=False):
     previous_categories = {}
 
     print(f"\nTimeline Drift Analysis for {company_name}")
-    print("=" * 70)
+    print("=" * 75)
 
     for i in range(1, len(versions)):
 
@@ -124,12 +155,20 @@ def compute_timeline_drift(company_name, return_data=False):
             category_severity
         )
 
-        # ΔR(t)
+        # Base Delta Risk
         delta_risk = (
             0.3 * structural_drift +
             0.5 * semantic_score +
             0.2 * escalation_intensity
         )
+
+        # 🔥 Irreversibility Multiplier
+        irreversible = is_irreversible(category_severity)
+
+        if irreversible:
+            delta_risk *= 1.25
+
+        delta_risk = round(delta_risk, 2)
 
         cumulative_cdi = min(round(cumulative_cdi + delta_risk, 2), 100)
 
@@ -139,6 +178,8 @@ def compute_timeline_drift(company_name, return_data=False):
         print(f"Structural Drift: {structural_drift}%")
         print(f"Semantic Risk: {round(semantic_score,2)}/10")
         print(f"Escalation Intensity: {escalation_intensity}")
+        if irreversible:
+            print("Irreversible Expansion Detected: YES")
         print(f"Consent Decay Index (CDI): {cumulative_cdi}/100")
 
         timeline_results.append({
@@ -147,10 +188,11 @@ def compute_timeline_drift(company_name, return_data=False):
             "structural_drift": structural_drift,
             "semantic_score": round(semantic_score, 2),
             "escalation_intensity": escalation_intensity,
+            "irreversible": irreversible,
             "cdi": cumulative_cdi
         })
 
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 75)
 
     if return_data:
         return timeline_results
