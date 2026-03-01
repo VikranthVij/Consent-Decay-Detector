@@ -7,17 +7,22 @@ from backend.llm_risk_engine import analyze_clause_with_llm
 
 
 # ==============================
-# Structural Drift
+# Structural Drift (FIXED)
 # ==============================
 
-def compute_structural_drift(modified, removed, added, total_old):
-    if total_old == 0:
+def compute_structural_drift(modified, removed, added, total_old, total_new):
+    if total_old == 0 and total_new == 0:
         return 0.0
 
-    return round(
-        ((modified * 0.4) + (removed * 0.3) + (added * 0.3)) / total_old * 100,
-        2
-    )
+    max_possible = max(total_old, total_new)
+
+    drift = (
+        (modified * 0.4) +
+        (removed * 0.3) +
+        (added * 0.3)
+    ) / max_possible * 100
+
+    return round(min(drift, 100), 2)
 
 
 # ==============================
@@ -36,7 +41,7 @@ def compute_escalation_intensity(previous_categories, current_categories):
 
 
 # ==============================
-# Irreversibility Detection
+# Irreversibility Detection (FIXED)
 # ==============================
 
 IRREVERSIBLE_CATEGORIES = {
@@ -48,9 +53,15 @@ IRREVERSIBLE_CATEGORIES = {
 }
 
 
-def is_irreversible(category_severity):
-    for cat in category_severity.keys():
-        if cat in IRREVERSIBLE_CATEGORIES:
+def is_irreversible(previous_categories, current_categories):
+    """
+    Irreversible only if NEW irreversible category appears
+    """
+    for cat in current_categories.keys():
+        if (
+            cat in IRREVERSIBLE_CATEGORIES and
+            cat not in previous_categories
+        ):
             return True
     return False
 
@@ -127,8 +138,13 @@ def compute_timeline_drift(company_name, return_data=False):
 
         added = len(new_chunks) - len(matched_new_indices)
 
+        # 🔥 Fixed Structural Drift
         structural_drift = compute_structural_drift(
-            modified, removed, added, len(old_chunks)
+            modified,
+            removed,
+            added,
+            len(old_chunks),
+            len(new_chunks)
         )
 
         clause_results = []
@@ -145,6 +161,7 @@ def compute_timeline_drift(company_name, return_data=False):
                         result.get("risk_score", 0) // 2
                     )
 
+        # ⚠ DO NOT TOUCH SEMANTIC RISK
         semantic_score = (
             sum([c["risk_score"] for c in clause_results]) / len(clause_results)
             if clause_results else 0
@@ -155,15 +172,17 @@ def compute_timeline_drift(company_name, return_data=False):
             category_severity
         )
 
-        # Base Delta Risk
-        delta_risk = (
-            0.3 * structural_drift +
-            0.5 * semantic_score +
-            0.2 * escalation_intensity
-        )
+        irreversible = is_irreversible(previous_categories, category_severity)
 
-        # 🔥 Irreversibility Multiplier
-        irreversible = is_irreversible(category_severity)
+        # ==========================================
+        # Improved Delta Risk Balance
+        # ==========================================
+
+        delta_risk = (
+            0.25 * structural_drift +   # reduced structural weight
+            0.5 * semantic_score +     # semantic unchanged
+            0.25 * escalation_intensity  # slightly increased escalation
+        )
 
         if irreversible:
             delta_risk *= 1.25
@@ -172,7 +191,7 @@ def compute_timeline_drift(company_name, return_data=False):
 
         cumulative_cdi = min(round(cumulative_cdi + delta_risk, 2), 100)
 
-        previous_categories = category_severity
+        previous_categories = category_severity.copy()
 
         print(f"\n{old_time} → {new_time}")
         print(f"Structural Drift: {structural_drift}%")
