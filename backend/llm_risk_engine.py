@@ -3,7 +3,7 @@ import json
 import re
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL_NAME = "llama3.2"
+MODEL_NAME = "llama3"
 
 
 # ==========================================
@@ -89,25 +89,28 @@ def extract_rule_categories(text):
 # ==========================================
 
 def safe_extract_json(text):
+    if not text:
+        return None
 
-    # Remove markdown fences
+    # Remove markdown code fences if present
+    text = text.strip()
     text = text.replace("```json", "").replace("```", "").strip()
 
-    # Extract first JSON block (non-greedy)
-    match = re.search(r"\{.*?\}", text, re.DOTALL)
-    if not match:
-        return None
-
-    json_candidate = match.group(0)
-
-    # Remove trailing commas
-    json_candidate = re.sub(r",\s*}", "}", json_candidate)
-    json_candidate = re.sub(r",\s*]", "]", json_candidate)
-
+    # Try direct parse first
     try:
-        return json.loads(json_candidate)
-    except json.JSONDecodeError:
-        return None
+        return json.loads(text)
+    except:
+        pass
+
+    # Try to extract first JSON object non-greedily
+    matches = re.findall(r"\{.*?\}", text, re.DOTALL)
+    for match in matches:
+        try:
+            return json.loads(match)
+        except:
+            continue
+
+    return None
 
 
 # ==========================================
@@ -156,12 +159,17 @@ Return ONLY valid JSON:
             json={
                 "model": MODEL_NAME,
                 "prompt": prompt,
-                "stream": False
+                "stream": False,
+                "format": "json"   # 🔥 THIS IS IMPORTANT
             },
             timeout=120
         )
+       
 
-        raw_output = response.json()["response"]
+        raw_json = response.json()
+        print("OLLAMA RAW RESPONSE:", raw_json)
+
+        raw_output = raw_json.get("response", "")
 
         parsed = safe_extract_json(raw_output)
 
