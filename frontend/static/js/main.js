@@ -89,11 +89,11 @@ function renderCompanyGrid(companies) {
     }
 
     const colors = [
-        'linear-gradient(135deg, #3b82f6, #06b6d4)',
-        'linear-gradient(135deg, #8b5cf6, #ec4899)',
-        'linear-gradient(135deg, #f59e0b, #ef4444)',
-        'linear-gradient(135deg, #22c55e, #06b6d4)',
-        'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        'linear-gradient(135deg, #5aad50, #B8E2B0)',
+        'linear-gradient(135deg, #7cc574, #d4f0cf)',
+        'linear-gradient(135deg, #4a9642, #a8d8a0)',
+        'linear-gradient(135deg, #B8E2B0, #5aad50)',
+        'linear-gradient(135deg, #6dba64, #B8E2B0)',
     ];
 
     grid.innerHTML = companies.map((c, i) => `
@@ -237,12 +237,12 @@ function renderChunkChart(data) {
             datasets: [{
                 data: [data.unchanged, data.modified, data.removed, data.added],
                 backgroundColor: [
-                    'rgba(34, 197, 94, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(239, 68, 68, 0.8)',
-                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(90, 173, 80, 0.7)',
+                    'rgba(230, 168, 23, 0.7)',
+                    'rgba(220, 74, 58, 0.7)',
+                    'rgba(184, 226, 176, 0.7)',
                 ],
-                borderColor: '#1a2234',
+                borderColor: '#ffffff',
                 borderWidth: 3,
             }],
         },
@@ -254,7 +254,7 @@ function renderChunkChart(data) {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#8899b4',
+                        color: '#4a4a4a',
                         padding: 20,
                         font: { family: 'Inter', size: 12 },
                     },
@@ -498,8 +498,8 @@ function renderCDIChart(timeline) {
                 {
                     label: 'CDI (0-100)',
                     data: cdiData,
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderColor: '#dc4a3a',
+                    backgroundColor: 'rgba(220, 74, 58, 0.08)',
                     fill: true,
                     tension: 0.3,
                     pointRadius: 5,
@@ -509,7 +509,7 @@ function renderCDIChart(timeline) {
                 {
                     label: 'Structural Drift (%)',
                     data: driftData,
-                    borderColor: '#3b82f6',
+                    borderColor: '#5aad50',
                     backgroundColor: 'transparent',
                     borderDash: [5, 5],
                     tension: 0.3,
@@ -519,7 +519,7 @@ function renderCDIChart(timeline) {
                 {
                     label: 'Semantic Risk (×10)',
                     data: semanticData,
-                    borderColor: '#8b5cf6',
+                    borderColor: '#C1BFFF',
                     backgroundColor: 'transparent',
                     borderDash: [2, 3],
                     tension: 0.3,
@@ -537,29 +537,29 @@ function renderCDIChart(timeline) {
             },
             scales: {
                 x: {
-                    ticks: { color: '#5a6a85', font: { family: 'Inter', size: 11 } },
-                    grid: { color: 'rgba(30, 45, 74, 0.5)' },
+                    ticks: { color: '#888888', font: { family: 'Inter', size: 11 } },
+                    grid: { color: 'rgba(184, 226, 176, 0.3)' },
                 },
                 y: {
                     min: 0,
                     max: 100,
-                    ticks: { color: '#5a6a85', font: { family: 'Inter', size: 11 } },
-                    grid: { color: 'rgba(30, 45, 74, 0.5)' },
+                    ticks: { color: '#888888', font: { family: 'Inter', size: 11 } },
+                    grid: { color: 'rgba(184, 226, 176, 0.3)' },
                 },
             },
             plugins: {
                 legend: {
                     labels: {
-                        color: '#8899b4',
+                        color: '#4a4a4a',
                         padding: 20,
                         font: { family: 'Inter', size: 12 },
                     },
                 },
                 tooltip: {
-                    backgroundColor: '#1a2234',
-                    titleColor: '#e8edf5',
-                    bodyColor: '#8899b4',
-                    borderColor: '#1e2d4a',
+                    backgroundColor: '#ffffff',
+                    titleColor: '#1a1a1a',
+                    bodyColor: '#4a4a4a',
+                    borderColor: '#B8E2B0',
                     borderWidth: 1,
                     padding: 12,
                     titleFont: { family: 'Inter', weight: '600' },
@@ -710,15 +710,15 @@ function riskColor(level) {
 }
 
 function scoreColor(score) {
-    if (score >= 7) return '#ef4444';
-    if (score >= 4) return '#f59e0b';
-    return '#22c55e';
+    if (score >= 7) return '#dc4a3a';
+    if (score >= 4) return '#e6a817';
+    return '#5aad50';
 }
 
 function cdiColor(cdi) {
-    if (cdi >= 60) return '#ef4444';
-    if (cdi >= 30) return '#f59e0b';
-    return '#22c55e';
+    if (cdi >= 60) return '#dc4a3a';
+    if (cdi >= 30) return '#e6a817';
+    return '#5aad50';
 }
 
 // ==========================================
