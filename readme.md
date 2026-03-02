@@ -1,227 +1,284 @@
-# 📄 README.md
+Here is your **clean, polished Markdown README**, formatted professionally and ready to copy-paste directly into GitHub:
 
-```markdown
-# Consent Decay Detector  
-### Policy Drift Intelligence Platform  
-Developed for AMD Hackathon (Slingshot Challenge)
+---
+
+# Consent Decay Detector (CDD)
+
+## Policy Drift Intelligence & Consent Erosion Modeling Platform
+
+Developed for AMD Slingshot Hackathon
 
 ---
 
 ## 📌 Overview
 
-Consent Decay Detector is an automated policy monitoring system that tracks changes in privacy policies and terms of service over time.
+Consent Decay Detector (CDD) is a privacy-preserving, AI-powered policy intelligence platform that tracks, analyzes, and quantifies how corporate data rights expand over time.
 
-The system scrapes public policy pages, stores historical versions, and detects updates using cryptographic hashing.  
+Unlike traditional diff tools that only highlight textual edits, CDD models the evolution of consent power using structural drift detection, LLM-based semantic risk analysis, escalation tracking, and cumulative risk scoring.
 
-It forms the foundation of a larger Policy Drift Intelligence Platform aimed at quantifying semantic expansion of user consent over time.
+It introduces a novel metric called the **Consent Decay Index (CDI)** — a quantitative measure of how user consent scope expands across policy versions.
 
 ---
 
 ## 🎯 Problem Statement
 
-Digital platforms frequently update their:
+Digital platforms frequently update:
 
-- Privacy Policies  
-- Terms of Service  
-- Data Usage Policies  
+* Privacy Policies
+* Terms of Service
+* Data Usage Agreements
 
-Users provide consent once, but policies evolve silently.
+Users consent once, but policies evolve silently.
 
 Existing tools:
-- Highlight textual changes
-- Show redline diffs
-- Send alerts
+
+* Show redline differences
+* Highlight textual edits
+* Send alerts
 
 They do **not**:
-- Track structured historical versions automatically
-- Store policy evolution in a database
-- Prepare data for semantic drift analysis
 
-This project builds the automated monitoring backbone required for policy drift intelligence.
+* Store structured historical versions automatically
+* Detect semantic expansion beyond wording
+* Track escalation of data-processing categories
+* Identify irreversible data power shifts
+* Quantify cumulative consent erosion
 
----
-
-## 🚀 What Has Been Implemented
-
-### ✅ 1. Automated Policy Crawler
-
-- Supports static HTML pages
-- Supports JavaScript-rendered pages (via Playwright)
-- Extracts readable policy text
-- Cleans and processes content
+CDD transforms policy evolution into measurable intelligence.
 
 ---
 
-### ✅ 2. SQLite Database Integration
+## 🚀 Core Capabilities
 
-The system stores data in a structured SQLite database.
+### 1️⃣ Structural Drift Detection
 
-#### Database: `policies.db`
+* Clause-level comparison using sentence embeddings
+* Cosine similarity matrix computation
+* Classification into unchanged, modified, removed, added
+* Structural drift percentage calculation
+
+### 2️⃣ LLM-Based Semantic Risk Analysis
+
+* Ollama-hosted LLM (Mistral / LLaMA)
+* Risk scoring (0–10)
+* Controlled ontology classification:
+
+  * AI training
+  * Retention expansion
+  * Cross-platform sharing
+  * Profiling
+  * Automated decision-making
+* Strict category constraints to prevent hallucination
+
+### 3️⃣ Category Escalation Tracking
+
+* Version-level category severity maps
+* Escalation intensity computation across versions
+
+### 4️⃣ Irreversibility Detection
+
+Flags permanent shifts such as:
+
+* AI model training on user data
+* Historical data reclassification
+* Automated decision systems
+
+### 5️⃣ Consent Decay Index (CDI)
+
+Cumulative metric combining:
+
+* Structural Drift
+* Semantic Expansion
+* Escalation Intensity
+* Irreversible Expansion
+
+CDI models consent momentum on a 0–100 scale.
+
+---
+
+## 🏗 System Workflow
+
+### Step 1: Policy Crawling
+
+* Supports static HTML pages
+* Supports JavaScript-rendered pages (Playwright)
+* Extracts readable policy text
+* Cleans and processes content
+
+### Step 2: Hash-Based Change Detection
+
+* Generates SHA256 hash of policy text
+* Compares with latest stored hash
+* Stores only if content changed
+* Prevents duplicate versions
+
+### Step 3: Version Storage (SQLite)
+
+Database: `policies.db`
 
 Tables:
 
 **companies**
-| id | name | url |
+
+* id
+* name
+* url
 
 **policy_versions**
-| id | company_id | timestamp | hash | content |
 
-Features:
-- Foreign key relationships
-- Timestamped version storage
-- Efficient historical tracking
+* id
+* company_id
+* timestamp
+* hash
+* content
 
----
+Enables structured historical tracking.
 
-### ✅ 3. Hash-Based Change Detection
+### Step 4: Text Processing
 
-Each fetched policy is processed as follows:
+* Normalization using Python + regex
+* Clause-level chunking for semantic precision
 
-1. Extract full text
-2. Generate SHA256 hash
-3. Compare against latest stored hash
-4. If unchanged → skip
-5. If changed → store new version
+### Step 5: Embedding & Similarity Engine
 
-This ensures:
-- No duplicate entries
-- Efficient monitoring
-- Accurate version tracking
+* Sentence embeddings
+* Cosine similarity computation
+* Structural classification via thresholds
 
----
+### Step 6: LLM Risk Engine
 
-### ✅ 4. Version Retrieval Module
+* On-device inference via Ollama
+* Structured JSON output validation
+* Controlled ontology enforcement
 
-`versioning.py` enables retrieval of:
+### Step 7: Timeline Drift Engine
 
-- Earliest stored version
-- Latest stored version
+* Version-to-version structural comparison
+* Semantic expansion analysis
+* Escalation growth modeling
+* Irreversibility detection
+* CDI accumulation
 
-This prepares the system for future semantic comparison between baseline and current policies.
+### Step 8: Interactive Dashboard
 
----
+Displays:
 
-## 🏗 Project Structure
-
-```
-
-consent_decay_detector/
-│
-├── backend/
-│   ├── __init__.py
-│   ├── crawler.py
-│   ├── database.py
-│   ├── versioning.py
-│   ├── registry.json
-│   └── policies.db
-│
-├── requirements.txt
-└── README.md
-
-````
+* Structural Drift (%)
+* Semantic Risk (/10)
+* Escalation Intensity
+* CDI Timeline Visualization
 
 ---
 
-## ⚙️ How It Works
+## 🧠 Technology Stack
 
-1. `registry.json` defines companies and policy URLs.
-2. `crawler.py` fetches policy content.
-3. Text is cleaned and hashed.
-4. Database is queried for latest stored hash.
-5. If new → insert new version.
-6. If same → skip.
-
----
-
-## 🧩 Core Modules Used
-
-- Python 3.9+
-- sqlite3
-- requests
-- trafilatura
-- playwright
-- hashlib
-- json
-- datetime
+* Python 3.9+
+* SQLite
+* Playwright
+* Sentence Embeddings
+* NumPy (Cosine Similarity)
+* Ollama (Local LLM Hosting)
+* HTML / CSS / JavaScript
+* Browser Extension Integration
 
 ---
 
-## ▶️ How To Run
+# ⚙ Installation & Setup
 
-### 1. Clone Repository
+## 1️⃣ Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/consent-decay-detector.git
+git clone https://github.com/your-username/consent-decay-detector.git
 cd consent-decay-detector
-````
+```
 
-### 2. Create Virtual Environment
+---
+
+## 2️⃣ Create Virtual Environment
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate      # macOS / Linux
+venv\Scripts\activate         # Windows
 ```
 
-### 3. Install Dependencies
+---
+
+## 3️⃣ Install Dependencies
 
 ```bash
 pip install -r requirements.txt
+```
+
+---
+
+## 4️⃣ Install & Start Ollama
+
+Download Ollama from:
+[https://ollama.com](https://ollama.com)
+
+Start server:
+
+```bash
+ollama serve
+```
+
+Pull model:
+
+```bash
+ollama pull mistral:instruct
+```
+
+---
+
+## 5️⃣ Install Playwright Browsers
+
+```bash
 playwright install
 ```
 
-### 4. Run Crawler
+---
+
+# ▶ Running the System
+
+## Crawl & Store Policy
 
 ```bash
-python3 -m backend.crawler
+python backend/crawler.py
 ```
 
-The system will:
+## Run Drift Analysis
 
-* Fetch policies
-* Compare hash
-* Store new versions if changes detected
+```bash
+python backend/drift_engine.py
+```
 
----
+## Launch Frontend Dashboard
 
-## 📈 Current Status
+```bash
+python frontend/app.py
+```
 
-✔ Automated scraping (static + JS-rendered pages)
-✔ Structured SQLite integration
-✔ Version storage
-✔ Hash-based change detection
-✔ Baseline & latest version retrieval
+Open in browser:
 
----
-
-## 🔜 Upcoming Development
-
-Next phase will implement:
-
-* Policy chunking
-* Embedding generation
-* Semantic similarity computation
-* Drift magnitude scoring
-* Risk-weighted expansion detection
-
-This will evolve the system into a full Policy Drift Intelligence Platform.
+```
+http://localhost:5000
+```
 
 ---
 
-## 🏁 Hackathon Context
+## 🌍 Impact
 
-This project is being developed for the **AMD Hackathon (Slingshot Challenge)** and demonstrates:
+CDD transforms privacy policy evolution from a legal diff process into a quantitative intelligence framework.
 
-* Applied NLP infrastructure
-* Automated monitoring systems
-* Structured database design
-* Scalable AI-ready architecture
+Instead of asking:
+
+**“What changed?”**
+
+CDD answers:
+
+**“How much more power did the company gain?”**
 
 ---
 
-## ⚖️ Ethical Note
-
-* Only publicly available policy documents are processed.
-* No private user data is collected.
-* No invasive system monitoring is performed.
-
-
+If you want, I can now give you a **clean badge-style professional GitHub header version** (with shields, architecture diagram section, and demo GIF section).
