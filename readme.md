@@ -1,7 +1,3 @@
-Here is your **clean, polished Markdown README**, formatted professionally and ready to copy-paste directly into GitHub:
-
----
-
 # Consent Decay Detector (CDD)
 
 ## Policy Drift Intelligence & Consent Erosion Modeling Platform
@@ -279,6 +275,4 @@ CDD answers:
 
 **“How much more power did the company gain?”**
 
----
 
-If you want, I can now give you a **clean badge-style professional GitHub header version** (with shields, architecture diagram section, and demo GIF section).
