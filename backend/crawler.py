@@ -70,10 +70,7 @@ def fetch_dynamic(url):
 
             print("Opening:", url)
 
-            page.goto(url, timeout=60000)
-
-            # Wait only for DOM ready (NOT networkidle)
-            page.wait_for_load_state("domcontentloaded")
+            page.goto(url, timeout=90000, wait_until="domcontentloaded")
 
             # Small wait for content rendering
             page.wait_for_timeout(5000)
@@ -130,17 +127,71 @@ def save_new_version(conn, company_id, hash_value, content):
     """, (company_id, hash_value, content))
     conn.commit()
 
-
 # ==============================
-# Main Execution
+# Crawl Single Company
 # ==============================
 
-if __name__ == "__main__":
-
+def crawl_company(company_name):
     init_db()
 
     with open("backend/registry.json") as f:
         registry = json.load(f)
+
+    entry = next((e for e in registry if e["company"] == company_name), None)
+
+    if not entry:
+        return {"error": "Company not found in registry"}
+
+    url = entry["url"]
+
+    conn = sqlite3.connect(DB_PATH)
+
+    print(f"\nFetching {company_name}...")
+
+    text = fetch_static(url)
+
+    if not text:
+        print("Static failed. Trying dynamic...")
+        text = fetch_dynamic(url)
+
+    if not text:
+        conn.close()
+        return {
+            "status": "failed",
+            "message": "Unable to fetch policy"
+        }
+
+    company_id = get_company_id(conn, company_name, url)
+    new_hash = generate_hash(text)
+    old_hash = get_latest_hash(conn, company_id)
+
+    if old_hash == new_hash:
+        conn.close()
+        return {
+            "status": "no_change",
+            "message": "No change detected"
+        }
+
+    save_new_version(conn, company_id, new_hash, text)
+    conn.close()
+
+    return {
+        "status": "updated",
+        "message": "New policy version stored"
+    }
+
+
+# ==============================
+# Crawl All Companies
+# ==============================
+
+def crawl_all():
+    init_db()
+
+    with open("backend/registry.json") as f:
+        registry = json.load(f)
+
+    results = []
 
     conn = sqlite3.connect(DB_PATH)
 
@@ -157,7 +208,10 @@ if __name__ == "__main__":
             text = fetch_dynamic(url)
 
         if not text:
-            print(f"❌ Failed to fetch {company}")
+            results.append({
+                "company": company,
+                "status": "failed"
+            })
             continue
 
         company_id = get_company_id(conn, company, url)
@@ -165,10 +219,26 @@ if __name__ == "__main__":
         old_hash = get_latest_hash(conn, company_id)
 
         if old_hash == new_hash:
-            print(f"✓ No change detected for {company}")
+            results.append({
+                "company": company,
+                "status": "no_change"
+            })
         else:
             save_new_version(conn, company_id, new_hash, text)
-            print(f"✓ New version stored for {company}")
+            results.append({
+                "company": company,
+                "status": "updated"
+            })
 
     conn.close()
+    return results
+
+
+# ==============================
+# Script Mode (Keep Working)
+# ==============================
+
+if __name__ == "__main__":
+    result = crawl_all()
     print("\nDone.")
+    print(result)

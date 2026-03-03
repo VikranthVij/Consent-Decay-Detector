@@ -206,16 +206,15 @@ function populateSelects(companies) {
 
 function onAnalysisCompanyChange() {
     const val = document.getElementById('analysisCompanySelect').value;
+
     document.getElementById('runDriftBtn').disabled = !val;
     document.getElementById('runQuickBtn').disabled = !val;
+
+    const crawlBtn = document.getElementById('crawlBtn');
+    if (crawlBtn) crawlBtn.disabled = !val;
+
     document.getElementById('quickStatsResults').classList.add('hidden');
     document.getElementById('driftResults').classList.add('hidden');
-    if (val) {
-        loadPolicySummary(val);
-    } else {
-        const panel = document.getElementById("policySummaryPanel");
-        if (panel) panel.classList.add("hidden");
-    }
 }
 
 async function runQuickStats() {
@@ -751,6 +750,47 @@ function renderScannerResults(data, container) {
 // ==========================================
 // Helpers
 // ==========================================
+async function manualCrawl() {
+    const name = document.getElementById('analysisCompanySelect').value;
+    if (!name) return;
+
+    const panel = document.getElementById("policySummaryPanel");
+    panel.classList.remove("hidden");
+    panel.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Fetching latest policy...</p>
+        </div>
+    `;
+
+    try {
+        const result = await api(`/api/company/${encodeURIComponent(name)}/crawl`, {
+            method: "POST"
+        });
+
+        panel.innerHTML = `
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Crawl Result</h3>
+                </div>
+                <div class="panel-body">
+                    <p><strong>Status:</strong> ${result.status}</p>
+                    <p>${result.message}</p>
+                </div>
+            </div>
+        `;
+
+        // Refresh company stats
+        loadDashboard();
+
+    } catch (e) {
+        panel.innerHTML = `
+            <div class="empty-state">
+                <p>Crawl failed: ${escapeHtml(e.message)}</p>
+            </div>
+        `;
+    }
+}
 
 function showAnalysisLoading(text) {
     document.getElementById('quickStatsResults').classList.add('hidden');

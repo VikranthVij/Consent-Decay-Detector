@@ -360,6 +360,15 @@ def api_get_user_companies(user_id):
 
     return jsonify({"companies": companies})
 
+@app.route("/api/company/<name>/crawl", methods=["POST"])
+def api_manual_crawl(name):
+    try:
+        from backend.crawler import crawl_company
+        result = crawl_company(name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==========================================
 # Run
 # ==========================================
