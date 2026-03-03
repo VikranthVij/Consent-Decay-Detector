@@ -10,7 +10,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -69,6 +68,16 @@
     </header>
 
     <!-- Dashboard Section -->
+    <div class="panel" style="margin-bottom:20px;">
+        <div class="panel-header">
+            <h3>Select Companies to Monitor</h3>
+        </div>
+        <div class="panel-body">
+            <select id="companySelector" multiple size="6" style="width:100%; margin-bottom:12px;"></select>
+            <button class="btn btn-primary" onclick="saveSelections()">Save Selection</button>
+        </div>
+    </div>
+
     <section class="content-section active" id="section-dashboard">
         <div class="section-header">
             <h2>Tracked Companies</h2>
@@ -105,6 +114,7 @@
                 Quick Stats
             </button>
         </div>
+        <div id="policySummaryPanel" class="hidden"></div>
 
         <!-- Quick Stats Results -->
         <div id="quickStatsResults" class="hidden">

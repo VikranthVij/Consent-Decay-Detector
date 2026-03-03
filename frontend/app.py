@@ -1,13 +1,15 @@
 import sys
 import os
+
+# Add project root to Python path FIRST
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sqlite3
 import json
 from flask import Flask, render_template, jsonify, request
 
-# Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 from backend.database import DB_PATH, init_db
+from backend.policy_summary_engine import summarize_current_policy
 from backend.text_processing import normalize_text
 from backend.chunking import chunk_text
 from backend.embedding_engine import embed_chunks, compute_similarity_matrix
@@ -33,19 +35,34 @@ def index():
 
 @app.route("/api/companies")
 def api_companies():
-    """List all tracked companies with version counts."""
+    """List tracked companies (optionally filtered by user)."""
+    user_id = request.args.get("user_id")
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT c.id, c.name, c.url, COUNT(pv.id) as version_count,
-               MIN(pv.timestamp) as first_seen,
-               MAX(pv.timestamp) as last_seen
-        FROM companies c
-        LEFT JOIN policy_versions pv ON c.id = pv.company_id
-        GROUP BY c.id
-        ORDER BY c.name
-    """)
+    if user_id:
+        cursor.execute("""
+            SELECT c.id, c.name, c.url, COUNT(pv.id) as version_count,
+                   MIN(pv.timestamp) as first_seen,
+                   MAX(pv.timestamp) as last_seen
+            FROM companies c
+            JOIN user_companies uc ON c.id = uc.company_id
+            LEFT JOIN policy_versions pv ON c.id = pv.company_id
+            WHERE uc.user_id = ?
+            GROUP BY c.id
+            ORDER BY c.name
+        """, (user_id,))
+    else:
+        cursor.execute("""
+            SELECT c.id, c.name, c.url, COUNT(pv.id) as version_count,
+                   MIN(pv.timestamp) as first_seen,
+                   MAX(pv.timestamp) as last_seen
+            FROM companies c
+            LEFT JOIN policy_versions pv ON c.id = pv.company_id
+            GROUP BY c.id
+            ORDER BY c.name
+        """)
 
     companies = []
     for row in cursor.fetchall():
@@ -275,6 +292,73 @@ def api_analyze_text():
         "signal_summary": signal_summary,
     })
 
+@app.route("/api/company/<name>/summary")
+def api_policy_summary(name):
+    try:
+        summary = summarize_current_policy(name)
+        return jsonify({
+            "company": name,
+            "summary": summary
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/registry")
+def api_registry():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM companies ORDER BY name")
+    companies = [row[0] for row in cursor.fetchall()]
+
+    conn.close()
+    return jsonify({"companies": companies})
+
+@app.route("/api/user/<user_id>/companies", methods=["POST"])
+
+def api_set_user_companies(user_id):
+    data = request.get_json()
+    selected = data.get("companies", [])
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Ensure user exists
+    cursor.execute("INSERT OR IGNORE INTO users (id) VALUES (?)", (user_id,))
+
+    # Clear old selections
+    cursor.execute("DELETE FROM user_companies WHERE user_id = ?", (user_id,))
+
+    for company_name in selected:
+        cursor.execute("SELECT id FROM companies WHERE name=?", (company_name,))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("""
+                INSERT INTO user_companies (user_id, company_id)
+                VALUES (?, ?)
+            """, (user_id, row[0]))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "success"})
+
+@app.route("/api/user/<user_id>/companies", methods=["GET"])
+def api_get_user_companies(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT c.name
+        FROM companies c
+        JOIN user_companies uc ON c.id = uc.company_id
+        WHERE uc.user_id = ?
+    """, (user_id,))
+
+    companies = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({"companies": companies})
 
 # ==========================================
 # Run

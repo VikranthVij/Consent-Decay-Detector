@@ -7,9 +7,66 @@ let chunkChartInstance = null;
 let cdiChartInstance = null;
 
 // ==========================================
-// Navigation
+// User Identity + Company Selection
 // ==========================================
 
+function getUserId() {
+    let userId = localStorage.getItem("user_id");
+    if (!userId) {
+        userId = "user_" + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem("user_id", userId);
+    }
+    return userId;
+}
+
+async function loadRegistry() {
+    const data = await api('/api/registry');
+    const selector = document.getElementById('companySelector');
+    if (!selector) return;
+
+    selector.innerHTML = '';
+    data.companies.forEach(company => {
+        const opt = document.createElement('option');
+        opt.value = company;
+        opt.textContent = company;
+        selector.appendChild(opt);
+    });
+
+    loadUserSelections();
+}
+
+async function loadUserSelections() {
+    const selector = document.getElementById('companySelector');
+    if (!selector) return;
+
+    const userId = getUserId();
+    const data = await api(`/api/user/${userId}/companies`);
+    const selected = data.companies || [];
+
+    Array.from(selector.options).forEach(opt => {
+        opt.selected = selected.includes(opt.value);
+    });
+}
+
+async function saveSelections() {
+    const selector = document.getElementById('companySelector');
+    if (!selector) return;
+
+    const selected = Array.from(selector.selectedOptions).map(o => o.value);
+    const userId = getUserId();
+
+    await api(`/api/user/${userId}/companies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companies: selected })
+    });
+
+    loadDashboard();
+}
+
+// ==========================================
+// Navigation
+// ==========================================
 function navigateTo(section) {
     // Update nav
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -63,7 +120,8 @@ async function api(endpoint, options = {}) {
 
 async function loadDashboard() {
     try {
-        companiesData = await api('/api/companies');
+        const userId = getUserId();
+        companiesData = await api(`/api/companies?user_id=${userId}`);
         renderCompanyGrid(companiesData);
         populateSelects(companiesData);
     } catch (e) {
@@ -152,6 +210,12 @@ function onAnalysisCompanyChange() {
     document.getElementById('runQuickBtn').disabled = !val;
     document.getElementById('quickStatsResults').classList.add('hidden');
     document.getElementById('driftResults').classList.add('hidden');
+    if (val) {
+        loadPolicySummary(val);
+    } else {
+        const panel = document.getElementById("policySummaryPanel");
+        if (panel) panel.classList.add("hidden");
+    }
 }
 
 async function runQuickStats() {
@@ -288,6 +352,35 @@ function renderExpansionSignals(signals) {
     `).join('');
 }
 
+// ==========================================
+// Policy Summary
+// ==========================================
+
+async function loadPolicySummary(companyName) {
+    const panel = document.getElementById("policySummaryPanel");
+    if (!panel) return;
+
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Generating summary...</p></div>';
+
+    try {
+        const data = await api(`/api/company/${encodeURIComponent(companyName)}/summary`);
+
+        panel.innerHTML = `
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Current Policy Overview</h3>
+                </div>
+                <div class="panel-body">
+                    ${data.summary.formatted_summary.replace(/\n/g, "<br>")}
+                </div>
+            </div>
+        `;
+
+    } catch (e) {
+        panel.innerHTML = `<div class="empty-state"><p>Summary failed: ${escapeHtml(e.message)}</p></div>`;
+    }
+}
 // ==========================================
 // Full Drift Analysis
 // ==========================================
@@ -726,5 +819,6 @@ function cdiColor(cdi) {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    loadRegistry();
     loadDashboard();
 });
