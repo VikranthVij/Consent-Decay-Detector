@@ -215,6 +215,9 @@ function onAnalysisCompanyChange() {
 
     document.getElementById('quickStatsResults').classList.add('hidden');
     document.getElementById('driftResults').classList.add('hidden');
+    if (val) {
+        loadPolicySummary(val);
+    }
 }
 
 async function runQuickStats() {

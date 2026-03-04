@@ -27,5 +27,14 @@ def init_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crawl_metadata (
+            id INTEGER PRIMARY KEY,
+            last_run TIMESTAMP
+        )
+    """)
+
+    
+
     conn.commit()
     conn.close()

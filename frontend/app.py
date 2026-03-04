@@ -16,6 +16,7 @@ from backend.embedding_engine import embed_chunks, compute_similarity_matrix
 from backend.drift_engine import compute_policy_drift
 from backend.timeline_engine import compute_timeline_drift
 from backend.expansion_signal_engine import extract_expansion_signals
+from backend.scheduler import check_and_run_crawler
 
 app = Flask(__name__)
 
@@ -375,4 +376,8 @@ def api_manual_crawl(name):
 
 if __name__ == "__main__":
     init_db()
+
+    # Startup crawl check (runs if last crawl > 12 hours)
+    check_and_run_crawler()
+
     app.run(debug=True, port=5001, threaded=True)
